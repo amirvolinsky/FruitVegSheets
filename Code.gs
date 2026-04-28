@@ -36,9 +36,9 @@ var CONFIG = {
 
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('השוואת מחירים')
-    .addItem('התחל השוואה', 'showWizard')
-    .addItem('מדריך שימוש', 'showGuide')
+    .createMenu('🥕 השוואת מחירים')
+    .addItem('🚀 התחל השוואה', 'showWizard')
+    .addItem('📘 מדריך שימוש', 'showGuide')
     .addToUi();
 }
 
@@ -49,7 +49,7 @@ function showWizard() {
   var html = HtmlService.createHtmlOutputFromFile('Wizard')
     .setWidth(540)
     .setHeight(640);
-  SpreadsheetApp.getUi().showModalDialog(html, 'השוואת מחירים');
+  SpreadsheetApp.getUi().showModalDialog(html, '🥕 השוואת מחירים');
 }
 
 /**
@@ -105,11 +105,11 @@ function runFullComparisonBatch(pricingEntries, expenseRows) {
   // Add upload summary for non-technical users.
   var uniqueWeeks = {};
   for (i = 0; i < importedWeeks.length; i++) uniqueWeeks[importedWeeks[i]] = true;
-  var weeksList = Object.keys(uniqueWeeks).sort().join(', ');
+  var weeksList = Object.keys(uniqueWeeks).sort().map(getWeekRangeLabelFromIsoWeekFull).join(', ');
   return {
     success: true,
     message:
-      'נטענו ' + pricingEntries.length + ' מחירונים לשבועות: ' + weeksList + '.\n' +
+      '✅ נטענו ' + pricingEntries.length + ' מחירונים לתאריכים: ' + weeksList + '.\n' +
       er.message + '\n\n' + cmp.message
   };
 }
@@ -280,8 +280,8 @@ function getCurrentWeek() {
 function formatDateIsraeliShort(dateObj) {
   var dd = String(dateObj.getUTCDate()).padStart(2, '0');
   var mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
-  var yy = String(dateObj.getUTCFullYear()).slice(-2);
-  return dd + '/' + mm + '/' + yy;
+  var yyyy = String(dateObj.getUTCFullYear());
+  return dd + '/' + mm + '/' + yyyy;
 }
 
 /**
@@ -311,6 +311,14 @@ function getWeekRangeLabelFromIsoWeek(weekKey) {
 }
 
 /**
+ * Full readable week range label from ISO week key.
+ * Example: 2025-22 -> 26/05/2025 - 01/06/2025
+ */
+function getWeekRangeLabelFromIsoWeekFull(weekKey) {
+  return getWeekRangeLabelFromIsoWeek(weekKey);
+}
+
+/**
  * ISO calendar date string "YYYY-MM-DD" → ISO week string. Used by Wizard.html.
  */
 function getISOWeekFromIsoDateString(isoDateStr) {
@@ -324,6 +332,16 @@ function getISOWeekFromIsoDateString(isoDateStr) {
   var date = new Date(y, m, d);
   if (isNaN(date.getTime())) return null;
   return getISOWeek(date);
+}
+
+/**
+ * Returns full week range label from ISO date string.
+ * Example: 2025-06-01 -> 26/05/2025 - 01/06/2025
+ */
+function getWeekRangeLabelFromIsoDateStringFull(isoDateStr) {
+  var wk = getISOWeekFromIsoDateString(isoDateStr);
+  if (!wk) return '';
+  return getWeekRangeLabelFromIsoWeekFull(wk);
 }
 
 /**

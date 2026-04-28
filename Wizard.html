@@ -189,32 +189,32 @@
 </head>
 <body>
   <div class="intro">
-    <h1>השוואת מחירון להוצאות</h1>
+    <h1>🥕 השוואת מחירון להוצאות</h1>
     <p>מלאו את 3 השלבים ולחצו על הכפתור הירוק</p>
   </div>
 
   <div class="step">
     <div class="step-head">
       <span class="step-num">1</span>
-      <span class="step-title">מחירונים מהספק (1 עד 5 קבצים)</span>
+      <span class="step-title">📦 מחירונים מהספק (1 עד 5 קבצים)</span>
     </div>
     <div class="step-desc">אפשר להעלות מחירון אחד, או כמה (לרוב 4-5 לחודש). לכל מחירון בוחרים תאריך משלו.</div>
     <div id="pricingList" class="pricing-list"></div>
-    <button type="button" class="tiny-btn" id="addPricingBtn">+ הוסף מחירון נוסף</button>
+    <button type="button" class="tiny-btn" id="addPricingBtn">+ 🍏 הוסף מחירון נוסף</button>
     <div class="hint">בכל מחירון: עמודות מקט, פריט, מחירון</div>
   </div>
 
   <div class="step">
     <div class="step-head">
       <span class="step-num">2</span>
-      <span class="step-title">קובץ דוח הוצאות</span>
+      <span class="step-title">🧾 קובץ דוח הוצאות</span>
     </div>
     <div class="step-desc">Excel עם כל רכישות החודש (כמו שקיבלתם מהספק)</div>
     <input type="file" id="expensesFile" accept=".xlsx,.xls">
   </div>
 
   <div class="btn-wrap">
-    <button type="button" class="primary" id="runBtn" onclick="runComparison()">השווה עכשיו</button>
+    <button type="button" class="primary" id="runBtn" onclick="runComparison()">🧮 בצע השוואה</button>
   </div>
 
   <div id="status"></div>
@@ -284,7 +284,7 @@
       wrap.innerHTML =
         '<div class="pricing-item-head">' +
           '<span class="pricing-item-title">מחירון ' + idx + '</span>' +
-          '<button type="button" class="tiny-btn remove" data-action="remove">הסר</button>' +
+          '<button type="button" class="tiny-btn remove" data-action="remove">🗑️ הסר</button>' +
         '</div>' +
         '<div class="pricing-grid">' +
           '<input type="file" class="pricing-file" accept=".xlsx,.xls">' +
@@ -332,14 +332,14 @@
         return;
       }
       google.script.run
-        .withSuccessHandler(function(weekStr) {
-          badge.textContent = 'השבוע שיירשם: ' + weekStr;
+        .withSuccessHandler(function(rangeLabel) {
+          badge.textContent = 'טווח התאריכים שייבחר: ' + rangeLabel;
           badge.className = 'week-badge visible';
         })
         .withFailureHandler(function() {
           badge.className = 'week-badge';
         })
-        .getISOWeekFromIsoDateString(iso);
+        .getWeekRangeLabelFromIsoDateStringFull(iso);
     }
 
     function initPricingList() {
@@ -440,7 +440,10 @@
               .withSuccessHandler(function(result) {
                 btn.disabled = false;
                 if (result.success) {
-                  setStatus(result.message, 'success');
+                setStatus(result.message + '\n\n🎉 ההשוואה הסתיימה בהצלחה. החלון ייסגר אוטומטית.', 'success');
+                setTimeout(function() {
+                  google.script.host.close();
+                }, 1700);
                 } else {
                   setStatus(result.message, 'error');
                 }
