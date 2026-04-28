@@ -65,6 +65,50 @@
       color: #64748b;
       margin-bottom: 10px;
     }
+    .pricing-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pricing-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fafc;
+    }
+    .pricing-item-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .pricing-item-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .tiny-btn {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #475569;
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .tiny-btn:hover { background: #f1f5f9; }
+    .tiny-btn.remove {
+      border-color: #fecaca;
+      color: #b91c1c;
+      background: #fff1f2;
+    }
+    .tiny-btn.remove:hover { background: #ffe4e6; }
     input[type="file"] {
       font-size: 13px;
       width: 100%;
@@ -152,26 +196,17 @@
   <div class="step">
     <div class="step-head">
       <span class="step-num">1</span>
-      <span class="step-title">קובץ מחירון מהספק</span>
+      <span class="step-title">מחירונים מהספק (1 עד 5 קבצים)</span>
     </div>
-    <div class="step-desc">Excel עם עמודות: מקט, פריט, מחירון</div>
-    <input type="file" id="pricingFile" accept=".xlsx,.xls">
-    <div class="hint">קובץ Excel שהספק שולח עם המחירים</div>
+    <div class="step-desc">אפשר להעלות מחירון אחד, או כמה (לרוב 4-5 לחודש). לכל מחירון בוחרים תאריך משלו.</div>
+    <div id="pricingList" class="pricing-list"></div>
+    <button type="button" class="tiny-btn" id="addPricingBtn">+ הוסף מחירון נוסף</button>
+    <div class="hint">בכל מחירון: עמודות מקט, פריט, מחירון</div>
   </div>
 
   <div class="step">
     <div class="step-head">
       <span class="step-num">2</span>
-      <span class="step-title">מתי המחירון הזה רלוונטי?</span>
-    </div>
-    <div class="step-desc">בחרו תאריך — המערכת תחשב את השבוע אוטומטית</div>
-    <input type="date" id="pricingDate">
-    <div id="weekBadge" class="week-badge"></div>
-  </div>
-
-  <div class="step">
-    <div class="step-head">
-      <span class="step-num">3</span>
       <span class="step-title">קובץ דוח הוצאות</span>
     </div>
     <div class="step-desc">Excel עם כל רכישות החודש (כמו שקיבלתם מהספק)</div>
@@ -237,18 +272,68 @@
       return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
     }
 
-    document.getElementById('pricingDate').value = todayIso();
+    var pricingCounter = 0;
+    var MAX_PRICING_FILES = 5;
 
-    function updateWeekBadge() {
-      var iso = document.getElementById('pricingDate').value;
-      var badge = document.getElementById('weekBadge');
+    function createPricingItem() {
+      pricingCounter += 1;
+      var idx = pricingCounter;
+      var wrap = document.createElement('div');
+      wrap.className = 'pricing-item';
+      wrap.setAttribute('data-pricing-id', String(idx));
+      wrap.innerHTML =
+        '<div class="pricing-item-head">' +
+          '<span class="pricing-item-title">מחירון ' + idx + '</span>' +
+          '<button type="button" class="tiny-btn remove" data-action="remove">הסר</button>' +
+        '</div>' +
+        '<div class="pricing-grid">' +
+          '<input type="file" class="pricing-file" accept=".xlsx,.xls">' +
+          '<input type="date" class="pricing-date">' +
+          '<div class="week-badge"></div>' +
+        '</div>';
+
+      var dateInput = wrap.querySelector('.pricing-date');
+      dateInput.value = todayIso();
+
+      var removeBtn = wrap.querySelector('[data-action="remove"]');
+      removeBtn.onclick = function() {
+        var list = document.getElementById('pricingList');
+        if (list.children.length === 1) {
+          setStatus('חייב להיות לפחות מחירון אחד.', 'error');
+          return;
+        }
+        wrap.remove();
+        refreshPricingTitles();
+      };
+
+      dateInput.addEventListener('change', function() {
+        updateWeekBadgeForItem(wrap);
+      });
+      updateWeekBadgeForItem(wrap);
+
+      return wrap;
+    }
+
+    function refreshPricingTitles() {
+      var list = document.getElementById('pricingList');
+      var items = list.querySelectorAll('.pricing-item');
+      var i;
+      for (i = 0; i < items.length; i++) {
+        items[i].querySelector('.pricing-item-title').textContent = 'מחירון ' + (i + 1);
+      }
+      document.getElementById('addPricingBtn').disabled = items.length >= MAX_PRICING_FILES;
+    }
+
+    function updateWeekBadgeForItem(itemEl) {
+      var iso = itemEl.querySelector('.pricing-date').value;
+      var badge = itemEl.querySelector('.week-badge');
       if (!iso) {
         badge.className = 'week-badge';
         return;
       }
       google.script.run
         .withSuccessHandler(function(weekStr) {
-          badge.textContent = 'המחירון יירשם לשבוע: ' + weekStr;
+          badge.textContent = 'השבוע שיירשם: ' + weekStr;
           badge.className = 'week-badge visible';
         })
         .withFailureHandler(function() {
@@ -257,8 +342,17 @@
         .getISOWeekFromIsoDateString(iso);
     }
 
-    document.getElementById('pricingDate').addEventListener('change', updateWeekBadge);
-    updateWeekBadge();
+    function initPricingList() {
+      var list = document.getElementById('pricingList');
+      list.appendChild(createPricingItem());
+      refreshPricingTitles();
+      document.getElementById('addPricingBtn').onclick = function() {
+        var count = list.querySelectorAll('.pricing-item').length;
+        if (count >= MAX_PRICING_FILES) return;
+        list.appendChild(createPricingItem());
+        refreshPricingTitles();
+      };
+    }
 
     function setStatus(msg, type) {
       var el = document.getElementById('status');
@@ -322,57 +416,81 @@
         return;
       }
 
-      var pf = document.getElementById('pricingFile').files;
       var ef = document.getElementById('expensesFile').files;
-      var isoDate = document.getElementById('pricingDate').value;
-
-      if (!pf || !pf.length) {
-        setStatus('נא לבחור קובץ מחירון (שלב 1)', 'error');
-        return;
-      }
       if (!ef || !ef.length) {
-        setStatus('נא לבחור קובץ הוצאות (שלב 3)', 'error');
-        return;
-      }
-      if (!isoDate) {
-        setStatus('נא לבחור תאריך (שלב 2)', 'error');
+        setStatus('נא לבחור קובץ הוצאות (שלב 2)', 'error');
         return;
       }
 
       var btn = document.getElementById('runBtn');
       btn.disabled = true;
-      setStatus('טוען קבצים ומריץ השוואה...\nזה עלול לקחת כמה שניות.', 'loading');
+      var pricingItems = document.querySelectorAll('.pricing-item');
+      var entries = [];
+      var idx = 0;
 
-      parseSheet(pf[0], function(errP, pricingRows) {
-        if (errP) {
-          setStatus('שגיאה בקריאת המחירון: ' + errP.message, 'error');
+      function parseNextPricing() {
+        if (idx >= pricingItems.length) {
+          parseSheet(ef[0], function(errE, expenseRows) {
+            if (errE) {
+              setStatus('שגיאה בקריאת ההוצאות: ' + errE.message, 'error');
+              btn.disabled = false;
+              return;
+            }
+            google.script.run
+              .withSuccessHandler(function(result) {
+                btn.disabled = false;
+                if (result.success) {
+                  setStatus(result.message, 'success');
+                } else {
+                  setStatus(result.message, 'error');
+                }
+              })
+              .withFailureHandler(function(err) {
+                setStatus('שגיאה: ' + err.message, 'error');
+                btn.disabled = false;
+              })
+              .runFullComparisonBatch(entries, expenseRows);
+          });
+          return;
+        }
+
+        var item = pricingItems[idx];
+        var fileInput = item.querySelector('.pricing-file');
+        var dateInput = item.querySelector('.pricing-date');
+        var fileList = fileInput.files;
+        var isoDate = dateInput.value;
+
+        if (!fileList || !fileList.length) {
+          setStatus('נא לבחור קובץ עבור מחירון ' + (idx + 1) + '.', 'error');
           btn.disabled = false;
           return;
         }
-        parseSheet(ef[0], function(errE, expenseRows) {
-          if (errE) {
-            setStatus('שגיאה בקריאת ההוצאות: ' + errE.message, 'error');
+        if (!isoDate) {
+          setStatus('נא לבחור תאריך עבור מחירון ' + (idx + 1) + '.', 'error');
+          btn.disabled = false;
+          return;
+        }
+
+        parseSheet(fileList[0], function(errP, pricingRows) {
+          if (errP) {
+            setStatus('שגיאה בקריאת מחירון ' + (idx + 1) + ': ' + errP.message, 'error');
             btn.disabled = false;
             return;
           }
-
-          google.script.run
-            .withSuccessHandler(function(result) {
-              btn.disabled = false;
-              if (result.success) {
-                setStatus(result.message, 'success');
-              } else {
-                setStatus(result.message, 'error');
-              }
-            })
-            .withFailureHandler(function(err) {
-              setStatus('שגיאה: ' + err.message, 'error');
-              btn.disabled = false;
-            })
-            .runFullComparison(isoDate, pricingRows, expenseRows);
+          entries.push({
+            isoDateStr: isoDate,
+            pricingRows: pricingRows
+          });
+          idx += 1;
+          parseNextPricing();
         });
-      });
+      }
+
+      setStatus('טוען מחירונים והוצאות...\nזה עלול לקחת כמה שניות.', 'loading');
+      parseNextPricing();
     }
+
+    initPricingList();
   </script>
 </body>
 </html>

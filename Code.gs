@@ -53,18 +53,44 @@ function showWizard() {
 }
 
 /**
- * Wizard entry point: ISO date string "YYYY-MM-DD", parsed pricing rows, parsed expense rows.
- * Tags pricing with week derived from date, replaces Expenses, runs comparison, returns summary text.
+ * Wizard entry point (single pricing file) kept for backward compatibility.
  */
 function runFullComparison(isoDateStr, pricingRows, expenseRows) {
-  var weekStr = getISOWeekFromIsoDateString(isoDateStr);
-  if (!weekStr) {
-    return { success: false, message: 'תאריך לא תקין. בחרו תאריך בשלב 2.' };
+  return runFullComparisonBatch(
+    [{ isoDateStr: isoDateStr, pricingRows: pricingRows }],
+    expenseRows
+  );
+}
+
+/**
+ * Wizard entry point (multiple pricing files):
+ * pricingEntries: [{ isoDateStr: "YYYY-MM-DD", pricingRows: [...] }, ...]
+ * expenseRows: parsed expense sheet rows.
+ */
+function runFullComparisonBatch(pricingEntries, expenseRows) {
+  if (!pricingEntries || pricingEntries.length === 0) {
+    return { success: false, message: 'נא להוסיף לפחות מחירון אחד.' };
   }
 
-  var pr = importPricingData(weekStr, pricingRows);
-  if (!pr.success) {
-    return pr;
+  var importedWeeks = [];
+  var i;
+  for (i = 0; i < pricingEntries.length; i++) {
+    var entry = pricingEntries[i];
+    var weekStr = getISOWeekFromIsoDateString(entry.isoDateStr);
+    if (!weekStr) {
+      return {
+        success: false,
+        message: 'תאריך לא תקין במחירון מספר ' + (i + 1) + '.'
+      };
+    }
+    var pr = importPricingData(weekStr, entry.pricingRows);
+    if (!pr.success) {
+      return {
+        success: false,
+        message: 'מחירון ' + (i + 1) + ': ' + pr.message
+      };
+    }
+    importedWeeks.push(weekStr);
   }
 
   expenseRows = normalizeSheetRows(expenseRows);
@@ -73,7 +99,19 @@ function runFullComparison(isoDateStr, pricingRows, expenseRows) {
     return er;
   }
 
-  return executeComparison();
+  var cmp = executeComparison();
+  if (!cmp.success) return cmp;
+
+  // Add upload summary for non-technical users.
+  var uniqueWeeks = {};
+  for (i = 0; i < importedWeeks.length; i++) uniqueWeeks[importedWeeks[i]] = true;
+  var weeksList = Object.keys(uniqueWeeks).sort().join(', ');
+  return {
+    success: true,
+    message:
+      'נטענו ' + pricingEntries.length + ' מחירונים לשבועות: ' + weeksList + '.\n' +
+      er.message + '\n\n' + cmp.message
+  };
 }
 
 // ──────────────────────────────────────────────
