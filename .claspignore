@@ -1,0 +1,9 @@
+**/.git/**
+.venv/**
+node_modules/**
+README.md
+SETUP_GUIDE.md
+.gitignore
+.claspignore
+.clasp.json
+**/*.md

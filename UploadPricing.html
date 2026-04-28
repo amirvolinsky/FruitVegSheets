@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      padding: 24px;
+      color: #1e293b;
+      background: #f8fafc;
+    }
+    h2 { font-size: 18px; margin-bottom: 16px; color: #0f172a; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+    .field { margin-bottom: 18px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+      direction: ltr;
+      text-align: left;
+    }
+    input[type="file"] { font-size: 14px; }
+    .hint { font-size: 12px; color: #64748b; margin-top: 4px; }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 10px 28px;
+      border-radius: 6px;
+      font-size: 15px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #94a3b8; cursor: not-allowed; }
+    #status {
+      margin-top: 16px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
+    #status.success { display: block; background: #dcfce7; color: #166534; }
+    #status.error { display: block; background: #fee2e2; color: #991b1b; }
+    #status.loading { display: block; background: #dbeafe; color: #1e40af; }
+  </style>
+</head>
+<body>
+  <h2>📦 העלאת מחירון שבועי</h2>
+
+  <div class="field">
+    <label for="weekInput">שבוע (פורמט YYYY-WW)</label>
+    <input type="text" id="weekInput" placeholder="2026-18">
+    <div class="hint">לדוגמה: 2026-18 = שבוע 18 של 2026</div>
+  </div>
+
+  <div class="field">
+    <label for="fileInput">קובץ מחירון (Excel)</label>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <div class="hint">הקובץ צריך להכיל: מקט, פריט, מחירון</div>
+  </div>
+
+  <button id="uploadBtn" onclick="handleUpload()">העלה</button>
+
+  <div id="status"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    // Set default week to current ISO week
+    google.script.run.withSuccessHandler(function(week) {
+      if (week) document.getElementById('weekInput').value = week;
+    }).getCurrentWeek();
+
+    function setStatus(msg, type) {
+      var el = document.getElementById('status');
+      el.className = type;
+      el.textContent = msg;
+    }
+
+    function handleUpload() {
+      var week = document.getElementById('weekInput').value.trim();
+      if (!/^\d{4}-\d{2}$/.test(week)) {
+        setStatus('פורמט שבוע לא תקין. השתמש ב-YYYY-WW (לדוגמה: 2026-18)', 'error');
+        return;
+      }
+
+      var fileInput = document.getElementById('fileInput');
+      if (!fileInput.files || fileInput.files.length === 0) {
+        setStatus('בחר קובץ Excel.', 'error');
+        return;
+      }
+
+      var btn = document.getElementById('uploadBtn');
+      btn.disabled = true;
+      setStatus('קורא את הקובץ...', 'loading');
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var workbook = XLSX.read(data, { type: 'array' });
+          var sheetName = workbook.SheetNames[0];
+          var sheet = workbook.Sheets[sheetName];
+          var rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+          if (rows.length === 0) {
+            setStatus('הקובץ ריק.', 'error');
+            btn.disabled = false;
+            return;
+          }
+
+          setStatus('מעלה ' + rows.length + ' שורות...', 'loading');
+
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (result.success) {
+                setStatus(result.message, 'success');
+              } else {
+                setStatus(result.message, 'error');
+              }
+              btn.disabled = false;
+            })
+            .withFailureHandler(function(err) {
+              setStatus('שגיאה: ' + err.message, 'error');
+              btn.disabled = false;
+            })
+            .importPricingData(week, rows);
+        } catch (ex) {
+          setStatus('שגיאה בקריאת הקובץ: ' + ex.message, 'error');
+          btn.disabled = false;
+        }
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    }
+  </script>
+</body>
+</html>
