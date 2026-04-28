@@ -122,13 +122,37 @@
     }
     .week-badge {
       margin-top: 8px;
-      padding: 8px 12px;
+      padding: 10px 12px;
       background: #ecfdf5;
       border-radius: 8px;
       font-size: 13px;
       color: #166534;
       border: 1px solid #bbf7d0;
       display: none;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    .week-badge .pricing-badge-title {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #14532d;
+    }
+    .week-badge .pricing-badge-ltr {
+      direction: ltr;
+      unicode-bidi: isolate;
+      font-variant-numeric: tabular-nums;
+    }
+    .week-badge ol.pricing-week-list {
+      margin: 10px 0 0 0;
+      padding: 0 0 0 1.25rem;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #166534;
+      text-align: left;
+    }
+    .week-badge ol.pricing-week-list li {
+      margin-bottom: 4px;
     }
     .week-badge.visible { display: block; }
     .btn-wrap {
@@ -185,6 +209,43 @@
       color: #94a3b8;
       margin-top: 6px;
     }
+    select.pricing-scope {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      font-family: inherit;
+      background: #fff;
+    }
+    .pricing-block {
+      margin-top: 8px;
+    }
+    .pricing-block label {
+      display: block;
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .pricing-block-range {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .pricing-block-range label {
+      display: inline;
+      margin: 0;
+    }
+    input[type="month"] {
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 15px;
+      direction: ltr;
+    }
   </style>
 </head>
 <body>
@@ -198,7 +259,7 @@
       <span class="step-num">1</span>
       <span class="step-title">📦 מחירונים מהספק (1 עד 5 קבצים)</span>
     </div>
-    <div class="step-desc">אפשר להעלות מחירון אחד, או כמה (לרוב 4-5 לחודש). לכל מחירון בוחרים תאריך משלו.</div>
+    <div class="step-desc">בוחרים <strong>היקף</strong>: שבוע / חודש שלם / טווח תאריכים / יום בודד — ואז קובץ Excel. חודש או טווח יוצרים אוטומטית רישום לכל שבוע רלוונטי (אותם מחירים).</div>
     <div id="pricingList" class="pricing-list"></div>
     <button type="button" class="tiny-btn" id="addPricingBtn">+ 🍏 הוסף מחירון נוסף</button>
     <div class="hint">בכל מחירון: עמודות מקט, פריט, מחירון</div>
@@ -272,6 +333,22 @@
       return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
     }
 
+    function todayMonthIso() {
+      var d = new Date();
+      return d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+    }
+
+    function currentMonthRangeIso() {
+      var d = new Date();
+      var y = d.getFullYear();
+      var m = d.getMonth();
+      var last = new Date(y, m + 1, 0);
+      return {
+        start: y + '-' + pad2(m + 1) + '-01',
+        end: y + '-' + pad2(m + 1) + '-' + pad2(last.getDate())
+      };
+    }
+
     var pricingCounter = 0;
     var MAX_PRICING_FILES = 5;
 
@@ -287,13 +364,52 @@
           '<button type="button" class="tiny-btn remove" data-action="remove">🗑️ הסר</button>' +
         '</div>' +
         '<div class="pricing-grid">' +
+          '<label class="lbl-scope">היקף המחירון</label>' +
+          '<select class="pricing-scope">' +
+            '<option value="week">שבוע (תאריך אחד בשבוע)</option>' +
+            '<option value="month">חודש שלם</option>' +
+            '<option value="range">טווח תאריכים</option>' +
+            '<option value="day">יום בודד</option>' +
+          '</select>' +
           '<input type="file" class="pricing-file" accept=".xlsx,.xls">' +
-          '<input type="date" class="pricing-date">' +
+          '<div class="pricing-block pricing-block-week-day">' +
+            '<label>תאריך</label>' +
+            '<input type="date" class="pricing-date">' +
+          '</div>' +
+          '<div class="pricing-block pricing-block-month" style="display:none">' +
+            '<label>חודש</label>' +
+            '<input type="month" class="pricing-month">' +
+          '</div>' +
+          '<div class="pricing-block pricing-block-range" style="display:none">' +
+            '<label>מתאריך</label>' +
+            '<input type="date" class="pricing-range-start">' +
+            '<label>עד תאריך</label>' +
+            '<input type="date" class="pricing-range-end">' +
+          '</div>' +
           '<div class="week-badge"></div>' +
         '</div>';
 
+      var scopeSel = wrap.querySelector('.pricing-scope');
       var dateInput = wrap.querySelector('.pricing-date');
+      var monthInput = wrap.querySelector('.pricing-month');
+      var rangeStart = wrap.querySelector('.pricing-range-start');
+      var rangeEnd = wrap.querySelector('.pricing-range-end');
       dateInput.value = todayIso();
+      monthInput.value = todayMonthIso();
+      var mr = currentMonthRangeIso();
+      rangeStart.value = mr.start;
+      rangeEnd.value = mr.end;
+
+      function togglePricingBlocks() {
+        var sc = scopeSel.value;
+        wrap.querySelector('.pricing-block-week-day').style.display =
+          sc === 'week' || sc === 'day' ? 'block' : 'none';
+        wrap.querySelector('.pricing-block-month').style.display = sc === 'month' ? 'block' : 'none';
+        wrap.querySelector('.pricing-block-range').style.display = sc === 'range' ? 'block' : 'none';
+        updateWeekBadgeForItem(wrap);
+      }
+
+      scopeSel.addEventListener('change', togglePricingBlocks);
 
       var removeBtn = wrap.querySelector('[data-action="remove"]');
       removeBtn.onclick = function() {
@@ -309,7 +425,16 @@
       dateInput.addEventListener('change', function() {
         updateWeekBadgeForItem(wrap);
       });
-      updateWeekBadgeForItem(wrap);
+      monthInput.addEventListener('change', function() {
+        updateWeekBadgeForItem(wrap);
+      });
+      rangeStart.addEventListener('change', function() {
+        updateWeekBadgeForItem(wrap);
+      });
+      rangeEnd.addEventListener('change', function() {
+        updateWeekBadgeForItem(wrap);
+      });
+      togglePricingBlocks();
 
       return wrap;
     }
@@ -325,21 +450,23 @@
     }
 
     function updateWeekBadgeForItem(itemEl) {
-      var iso = itemEl.querySelector('.pricing-date').value;
       var badge = itemEl.querySelector('.week-badge');
-      if (!iso) {
-        badge.className = 'week-badge';
-        return;
-      }
+      var opts = {
+        scope: itemEl.querySelector('.pricing-scope').value,
+        isoDateStr: itemEl.querySelector('.pricing-date').value,
+        isoMonthStr: itemEl.querySelector('.pricing-month').value,
+        isoRangeStart: itemEl.querySelector('.pricing-range-start').value,
+        isoRangeEnd: itemEl.querySelector('.pricing-range-end').value
+      };
       google.script.run
-        .withSuccessHandler(function(rangeLabel) {
-          badge.textContent = 'טווח התאריכים שייבחר: ' + rangeLabel;
-          badge.className = 'week-badge visible';
+        .withSuccessHandler(function(html) {
+          badge.innerHTML = html || '';
+          badge.className = html ? 'week-badge visible' : 'week-badge';
         })
         .withFailureHandler(function() {
           badge.className = 'week-badge';
         })
-        .getWeekRangeLabelFromIsoDateStringFull(iso);
+        .describePricingImport(opts);
     }
 
     function initPricingList() {
@@ -459,19 +586,43 @@
 
         var item = pricingItems[idx];
         var fileInput = item.querySelector('.pricing-file');
-        var dateInput = item.querySelector('.pricing-date');
         var fileList = fileInput.files;
-        var isoDate = dateInput.value;
+        var scope = item.querySelector('.pricing-scope').value;
+        var isoDate = item.querySelector('.pricing-date').value;
+        var isoMonth = item.querySelector('.pricing-month').value;
+        var isoRs = item.querySelector('.pricing-range-start').value;
+        var isoRe = item.querySelector('.pricing-range-end').value;
 
         if (!fileList || !fileList.length) {
           setStatus('נא לבחור קובץ עבור מחירון ' + (idx + 1) + '.', 'error');
           btn.disabled = false;
           return;
         }
-        if (!isoDate) {
-          setStatus('נא לבחור תאריך עבור מחירון ' + (idx + 1) + '.', 'error');
-          btn.disabled = false;
-          return;
+        if (scope === 'week' || scope === 'day') {
+          if (!isoDate) {
+            setStatus('נא לבחור תאריך במחירון ' + (idx + 1) + '.', 'error');
+            btn.disabled = false;
+            return;
+          }
+        }
+        if (scope === 'month') {
+          if (!isoMonth) {
+            setStatus('נא לבחור חודש במחירון ' + (idx + 1) + '.', 'error');
+            btn.disabled = false;
+            return;
+          }
+        }
+        if (scope === 'range') {
+          if (!isoRs || !isoRe) {
+            setStatus('נא למלא טווח תאריכים במחירון ' + (idx + 1) + '.', 'error');
+            btn.disabled = false;
+            return;
+          }
+          if (isoRs > isoRe) {
+            setStatus('מחירון ' + (idx + 1) + ': תאריך ההתחלה אחרי תאריך הסיום.', 'error');
+            btn.disabled = false;
+            return;
+          }
         }
 
         parseSheet(fileList[0], function(errP, pricingRows) {
@@ -481,7 +632,11 @@
             return;
           }
           entries.push({
+            scope: scope,
             isoDateStr: isoDate,
+            isoMonthStr: isoMonth,
+            isoRangeStart: isoRs,
+            isoRangeEnd: isoRe,
             pricingRows: pricingRows
           });
           idx += 1;
