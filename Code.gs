@@ -275,6 +275,42 @@ function getCurrentWeek() {
 }
 
 /**
+ * Formats Date to Israeli short format: dd/MM/yy
+ */
+function formatDateIsraeliShort(dateObj) {
+  var dd = String(dateObj.getUTCDate()).padStart(2, '0');
+  var mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+  var yy = String(dateObj.getUTCFullYear()).slice(-2);
+  return dd + '/' + mm + '/' + yy;
+}
+
+/**
+ * Converts ISO week key (YYYY-WW) to readable range label.
+ * Example: 2025-22 -> 26/05/25 - 01/06/25
+ */
+function getWeekRangeLabelFromIsoWeek(weekKey) {
+  if (!weekKey) return '';
+  var parts = String(weekKey).split('-');
+  if (parts.length !== 2) return String(weekKey);
+  var year = parseInt(parts[0], 10);
+  var week = parseInt(parts[1], 10);
+  if (isNaN(year) || isNaN(week) || week < 1 || week > 53) return String(weekKey);
+
+  // Monday of ISO week 1: week containing Jan 4.
+  var jan4 = new Date(Date.UTC(year, 0, 4));
+  var jan4Day = jan4.getUTCDay() || 7; // Sunday -> 7
+  var week1Monday = new Date(jan4);
+  week1Monday.setUTCDate(jan4.getUTCDate() - (jan4Day - 1));
+
+  var monday = new Date(week1Monday);
+  monday.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7);
+  var sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+
+  return formatDateIsraeliShort(monday) + ' - ' + formatDateIsraeliShort(sunday);
+}
+
+/**
  * ISO calendar date string "YYYY-MM-DD" → ISO week string. Used by Wizard.html.
  */
 function getISOWeekFromIsoDateString(isoDateStr) {
@@ -450,6 +486,7 @@ function executeComparison() {
     var rawDate = row[dateCol];
     var date = (rawDate instanceof Date) ? rawDate : new Date(rawDate);
     var week = getISOWeek(date);
+    var weekDisplay = getWeekRangeLabelFromIsoWeek(week);
     var sku = String(row[skuCol]).replace(/\.0$/, '').trim();
 
     // Collect actual price values
@@ -460,7 +497,7 @@ function executeComparison() {
 
     // Base row data
     var baseRow = [
-      week,
+      weekDisplay,
       row['#'] !== undefined ? row['#'] : '',
       row['כרטיס'] !== undefined ? row['כרטיס'] : '',
       row['לקוח'] !== undefined ? row['לקוח'] : '',
@@ -529,7 +566,7 @@ function executeComparison() {
     if (!matchedKeys[dealerKeys[m]]) {
       var parts = dealerKeys[m].split('|');
       resultRows.push([
-        parts[0], '', '', '', '', '', parts[1], '', '', '', '', '', '',
+        getWeekRangeLabelFromIsoWeek(parts[0]), '', '', '', '', '', parts[1], '', '', '', '', '', '',
         dealerMap[dealerKeys[m]],
         '🔵 אין רכישה',
         ''
@@ -566,6 +603,8 @@ function executeComparison() {
 
   if (resultRows.length > 0) {
     compSheet.getRange(2, 1, resultRows.length, numCols).setValues(resultRows);
+    // תאריך בפורמט ישראלי ברור
+    compSheet.getRange(2, 6, resultRows.length, 1).setNumberFormat('dd/mm/yy');
   }
 
   var totalRows = resultRows.length + 1;
@@ -636,7 +675,7 @@ function executeComparison() {
   var summaryData = [];
   for (var wi = 0; wi < weekList.length; wi++) {
     var ws = weekStats[weekList[wi]];
-    summaryData.push([weekList[wi], ws.total, ws.match, ws.mismatch, ws.missing, ws.noPurchase]);
+    summaryData.push([getWeekRangeLabelFromIsoWeek(weekList[wi]), ws.total, ws.match, ws.mismatch, ws.missing, ws.noPurchase]);
   }
   if (summaryData.length > 0) {
     compSheet.getRange(summaryRow + 1, 1, summaryData.length, 6).setValues(summaryData);
