@@ -141,12 +141,46 @@
       color: #94a3b8;
       margin-top: 6px;
     }
+    .google-warning {
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #431407;
+    }
+    .google-warning strong { color: #9a3412; }
+    #libErr {
+      display: none;
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    #libErr.visible { display: block; }
   </style>
 </head>
 <body>
   <div class="intro">
     <h1>השוואת מחירון להוצאות</h1>
     <p>מלאו את 3 השלבים ולחצו על הכפתור הירוק</p>
+  </div>
+
+  <div class="google-warning">
+    <strong>גוגל חוסמת או מזהירה?</strong>
+    בפעם הראשונה תופיע אזהרה &quot;האפליקציה לא מאומתת&quot; — זה נורמלי.
+    לחצו <strong>מתקדם</strong> (Advanced) ואז <strong>עבור אל … (לא מוגן)</strong> / Go to … (unsafe), ובחרו חשבון כדי לאשר גישה לגיליון הזה בלבד.
+  </div>
+
+  <div id="libErr">
+    לא נטענה ספריית קבצי Excel. נסו דפדפן אחר (Chrome), חלון גלישה בסתר, או השביתו חוסם פרסומות/תוכן לדף זה.
+    מדריך מלא: תפריט → מדריך שימוש.
   </div>
 
   <div class="step">
@@ -184,8 +218,48 @@
 
   <div id="status"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script>
+    /** טוען את ספריית SheetJS מכמה מקורות — אם אחד נחסם או נכשל, מנסים את הבא */
+    function ensureXlsxLoaded(done) {
+      if (typeof XLSX !== 'undefined') {
+        done(true);
+        return;
+      }
+      var urls = [
+        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'
+      ];
+      var i = 0;
+      function tryNext() {
+        if (typeof XLSX !== 'undefined') {
+          done(true);
+          return;
+        }
+        if (i >= urls.length) {
+          done(false);
+          return;
+        }
+        var sc = document.createElement('script');
+        sc.async = true;
+        sc.src = urls[i++];
+        sc.onload = function() {
+          if (typeof XLSX !== 'undefined') done(true);
+          else tryNext();
+        };
+        sc.onerror = function() { tryNext(); };
+        document.head.appendChild(sc);
+      }
+      tryNext();
+    }
+
+    ensureXlsxLoaded(function(ok) {
+      var runBtn = document.getElementById('runBtn');
+      if (!ok) {
+        document.getElementById('libErr').className = 'visible';
+        runBtn.disabled = true;
+      }
+    });
+
     function pad2(n) {
       return (n < 10 ? '0' : '') + n;
     }
@@ -241,6 +315,12 @@
     }
 
     function runComparison() {
+      if (typeof XLSX === 'undefined') {
+        setStatus('ספריית Excel לא נטענה. רעננו את הדף או נסו דפדפן אחר.', 'error');
+        document.getElementById('libErr').className = 'visible';
+        return;
+      }
+
       var pf = document.getElementById('pricingFile').files;
       var ef = document.getElementById('expensesFile').files;
       var isoDate = document.getElementById('pricingDate').value;
