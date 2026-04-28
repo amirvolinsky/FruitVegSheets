@@ -266,6 +266,34 @@
       el.textContent = msg;
     }
 
+    function toSafeValue(v) {
+      if (v === undefined || v === null) return '';
+      if (v instanceof Date) {
+        var y = v.getFullYear();
+        var m = pad2(v.getMonth() + 1);
+        var d = pad2(v.getDate());
+        return y + '-' + m + '-' + d;
+      }
+      return v;
+    }
+
+    function normalizeRows(rows) {
+      if (!rows || !rows.length) return rows;
+      var maxCols = 0;
+      var i, j;
+      for (i = 0; i < rows.length; i++) {
+        if (rows[i] && rows[i].length > maxCols) maxCols = rows[i].length;
+      }
+      for (i = 0; i < rows.length; i++) {
+        if (!rows[i]) rows[i] = [];
+        while (rows[i].length < maxCols) rows[i].push('');
+        for (j = 0; j < rows[i].length; j++) {
+          rows[i][j] = toSafeValue(rows[i][j]);
+        }
+      }
+      return rows;
+    }
+
     function parseSheet(file, cb) {
       var reader = new FileReader();
       reader.onload = function(e) {
@@ -274,7 +302,12 @@
           var workbook = XLSX.read(data, { type: 'array', cellDates: true });
           var sheetName = workbook.SheetNames[0];
           var sheet = workbook.Sheets[sheetName];
-          var rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          var rows = XLSX.utils.sheet_to_json(sheet, {
+            header: 1,
+            raw: false,
+            dateNF: 'yyyy-mm-dd'
+          });
+          rows = normalizeRows(rows);
           cb(null, rows);
         } catch (ex) {
           cb(ex);
