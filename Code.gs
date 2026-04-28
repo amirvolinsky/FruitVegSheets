@@ -8,7 +8,7 @@
  *   1. Each week: dealer sends a pricing Excel (מקט, פריט, מחירון)
  *   2. User uploads via menu → tagged with the relevant week (YYYY-WW)
  *   3. Pricing sheet accumulates all weeks
- *   4. End of month: dealer sends expense report → pasted into Expenses
+ *   4. End of month: dealer sends expense report → uploaded via menu
  *   5. Comparison joins on (שבוע, מקט) — one price per SKU per week
  *
  * Status logic (from Python compare_prices / determine_status_and_diff):
@@ -35,7 +35,8 @@ var CONFIG = {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('🍎 השוואת מחירים')
-    .addItem('העלה מחירון שבועי', 'showUploadDialog')
+    .addItem('העלה מחירון שבועי', 'showUploadPricingDialog')
+    .addItem('העלה דוח הוצאות', 'showUploadExpensesDialog')
     .addItem('הרץ השוואה', 'compareWeeklyPrices')
     .addSeparator()
     .addItem('מדריך שימוש', 'showGuide')
@@ -56,11 +57,62 @@ function showGuide() {
 // UPLOAD PRICING — dialog
 // ──────────────────────────────────────────────
 
-function showUploadDialog() {
+function showUploadPricingDialog() {
   var html = HtmlService.createHtmlOutputFromFile('UploadPricing')
     .setWidth(480)
     .setHeight(360);
   SpreadsheetApp.getUi().showModalDialog(html, 'העלאת מחירון שבועי');
+}
+
+// ──────────────────────────────────────────────
+// UPLOAD EXPENSES — dialog
+// ──────────────────────────────────────────────
+
+function showUploadExpensesDialog() {
+  var html = HtmlService.createHtmlOutputFromFile('UploadExpenses')
+    .setWidth(480)
+    .setHeight(320);
+  SpreadsheetApp.getUi().showModalDialog(html, 'העלאת דוח הוצאות');
+}
+
+/**
+ * Called from UploadExpenses.html after client-side Excel parsing.
+ * Receives a 2D array (including header row) and writes to Expenses sheet.
+ * Replaces existing data each time (expense report is a full monthly file).
+ */
+function importExpensesData(rows) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.SHEET_EXPENSES);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET_EXPENSES);
+  }
+
+  if (!rows || rows.length === 0) {
+    return { success: false, message: 'לא נמצאו שורות בקובץ.' };
+  }
+
+  sheet.clearContents();
+  sheet.clearFormats();
+
+  // Write all rows including header
+  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+
+  // Format header row
+  sheet.getRange(1, 1, 1, rows[0].length)
+    .setFontWeight('bold')
+    .setBackground('#F1F5F9');
+  sheet.setFrozenRows(1);
+  sheet.setRightToLeft(true);
+
+  for (var col = 1; col <= rows[0].length; col++) {
+    sheet.autoResizeColumn(col);
+  }
+
+  return {
+    success: true,
+    message: 'נטענו ' + (rows.length - 1) + ' שורות הוצאות.'
+  };
 }
 
 /**
