@@ -34,13 +34,44 @@ var CONFIG = {
 
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('🍎 השוואת מחירים')
-    .addItem('העלה מחירון שבועי', 'showUploadPricingDialog')
-    .addItem('העלה דוח הוצאות', 'showUploadExpensesDialog')
-    .addItem('הרץ השוואה', 'compareWeeklyPrices')
-    .addSeparator()
+    .createMenu('השוואת מחירים')
+    .addItem('התחל השוואה', 'showWizard')
     .addItem('מדריך שימוש', 'showGuide')
     .addToUi();
+}
+
+/**
+ * Single wizard dialog — pricing file + date + expenses file + compare.
+ */
+function showWizard() {
+  var html = HtmlService.createHtmlOutputFromFile('Wizard')
+    .setWidth(540)
+    .setHeight(640);
+  SpreadsheetApp.getUi().showModalDialog(html, 'השוואת מחירים');
+}
+
+/**
+ * Wizard entry point: ISO date string "YYYY-MM-DD", parsed pricing rows, parsed expense rows.
+ * Tags pricing with week derived from date, replaces Expenses, runs comparison, returns summary text.
+ */
+function runFullComparison(isoDateStr, pricingRows, expenseRows) {
+  var weekStr = getISOWeekFromIsoDateString(isoDateStr);
+  if (!weekStr) {
+    return { success: false, message: 'תאריך לא תקין. בחרו תאריך בשלב 2.' };
+  }
+
+  var pr = importPricingData(weekStr, pricingRows);
+  if (!pr.success) {
+    return pr;
+  }
+
+  expenseRows = normalizeSheetRows(expenseRows);
+  var er = importExpensesData(expenseRows);
+  if (!er.success) {
+    return er;
+  }
+
+  return executeComparison();
 }
 
 // ──────────────────────────────────────────────
@@ -92,6 +123,15 @@ function importExpensesData(rows) {
     return { success: false, message: 'לא נמצאו שורות בקובץ.' };
   }
 
+  rows = normalizeSheetRows(rows);
+
+  if (rows.length < 2) {
+    return {
+      success: false,
+      message: 'קובץ ההוצאות חייב לכלול שורת כותרות ולפחות שורת נתונים אחת.'
+    };
+  }
+
   sheet.clearContents();
   sheet.clearFormats();
 
@@ -137,11 +177,13 @@ function importPricingData(week, rows) {
     return { success: false, message: 'לא נמצאו שורות בקובץ.' };
   }
 
-  // Detect header row — skip it if present
+  // Detect header row — skip it if first row looks like headers
   var startIdx = 0;
-  var firstCell = String(rows[0][0]).replace(/[^A-Za-z\u0590-\u05FF0-9]/g, '');
-  if (firstCell === 'מקט' || firstCell === 'מקט') {
-    startIdx = 1;
+  if (rows[0] && rows[0].length > 0) {
+    var head = sanitizeColName(String(rows[0][0]));
+    if (head.indexOf('מקט') !== -1 || head === 'מקט') {
+      startIdx = 1;
+    }
   }
 
   var output = [];
@@ -158,9 +200,11 @@ function importPricingData(week, rows) {
     output.push([week, sku, item, price]);
   }
 
-  if (output.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, output.length, 4).setValues(output);
+  if (output.length === 0) {
+    return { success: false, message: 'לא נמצאו שורות תקינות במחירון (חסר מקט).' };
   }
+
+  sheet.getRange(sheet.getLastRow() + 1, 1, output.length, 4).setValues(output);
 
   return {
     success: true,
@@ -188,6 +232,40 @@ function getISOWeek(date) {
  */
 function getCurrentWeek() {
   return getISOWeek(new Date());
+}
+
+/**
+ * ISO calendar date string "YYYY-MM-DD" → ISO week string. Used by Wizard.html.
+ */
+function getISOWeekFromIsoDateString(isoDateStr) {
+  if (!isoDateStr || typeof isoDateStr !== 'string') return null;
+  var parts = isoDateStr.split('-');
+  if (parts.length !== 3) return null;
+  var y = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10) - 1;
+  var d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  var date = new Date(y, m, d);
+  if (isNaN(date.getTime())) return null;
+  return getISOWeek(date);
+}
+
+/**
+ * Pad jagged 2D arrays so setValues does not fail.
+ */
+function normalizeSheetRows(rows) {
+  if (!rows || rows.length === 0) return rows;
+  var maxCols = 0;
+  var i;
+  for (i = 0; i < rows.length; i++) {
+    if (rows[i] && rows[i].length > maxCols) maxCols = rows[i].length;
+  }
+  if (maxCols === 0) return rows;
+  for (i = 0; i < rows.length; i++) {
+    if (!rows[i]) rows[i] = [];
+    while (rows[i].length < maxCols) rows[i].push('');
+  }
+  return rows;
 }
 
 // ──────────────────────────────────────────────
@@ -257,22 +335,33 @@ function toNum(val) {
 //   3. Compare actual vs expected (both מחיר לפני/אחרי מע"מ checked)
 //   4. Status: ✅ תואם / ❌ לא תואם / 🟡 חסר במחירון
 
+/**
+ * Menu entry / programmatic re-run: compares sheets already loaded (no upload).
+ */
 function compareWeeklyPrices() {
+  var r = executeComparison();
+  SpreadsheetApp.getUi().alert(r.message);
+}
+
+/**
+ * Core comparison: reads Pricing + Expenses, writes Comparison. Returns { success, message }.
+ */
+function executeComparison() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
 
   // ── 1. Read pricing into map: "week|sku" → מחירון ──────
   var pricingRows = sheetToObjects(CONFIG.SHEET_PRICING);
   if (pricingRows.length === 0) {
-    ui.alert('גיליון Pricing ריק או חסר.\nהעלה מחירון דרך התפריט.');
-    return;
+    return {
+      success: false,
+      message: 'גיליון Pricing ריק או חסר.\nהשתמשו בתפריט: התחל השוואה.'
+    };
   }
 
   var pricingHeaders = Object.keys(pricingRows[0]);
   var priceCol = findColumn(pricingHeaders, ['מחירון', 'מחיר']);
   if (!priceCol) {
-    ui.alert('לא נמצאה עמודת מחירון בגיליון Pricing.');
-    return;
+    return { success: false, message: 'לא נמצאה עמודת מחירון בגיליון Pricing.' };
   }
 
   var dealerMap = {};  // "week|sku" → price
@@ -288,16 +377,14 @@ function compareWeeklyPrices() {
   // ── 2. Read expenses ──────────────────────────────────
   var expRows = sheetToObjects(CONFIG.SHEET_EXPENSES);
   if (expRows.length === 0) {
-    ui.alert('גיליון Expenses ריק או חסר.');
-    return;
+    return { success: false, message: 'גיליון Expenses ריק או חסר.' };
   }
 
   var expHeaders = Object.keys(expRows[0]);
   var dateCol = findColumn(expHeaders, ['תאריך', 'date']);
   var skuCol = findColumn(expHeaders, ['מקט']);
   if (!dateCol || !skuCol) {
-    ui.alert('לא נמצאה עמודת מקט או תאריך בגיליון Expenses.');
-    return;
+    return { success: false, message: 'לא נמצאה עמודת מקט או תאריך בגיליון Expenses.' };
   }
 
   // Find actual price columns (mirrors Python _find_price_columns)
@@ -531,12 +618,14 @@ function compareWeeklyPrices() {
     .setFontWeight('bold')
     .setBorder(true, true, true, true, true, true);
 
-  ui.alert(
+  var msg =
     'השוואה הושלמה!\n\n' +
     resultRows.length + ' שורות הושוו.\n' +
     grandTotal.match + ' תואם ✅\n' +
     grandTotal.mismatch + ' לא תואם ❌\n' +
     grandTotal.missing + ' חסר במחירון 🟡\n' +
-    grandTotal.noPurchase + ' אין רכישה 🔵'
-  );
+    grandTotal.noPurchase + ' אין רכישה 🔵\n\n' +
+    'התוצאות בגיליון Comparison.';
+
+  return { success: true, message: msg };
 }

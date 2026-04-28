@@ -96,62 +96,37 @@
   </style>
 </head>
 <body>
-  <h2>🍎 מדריך — השוואת מחירי ספק</h2>
+  <h2>מדריך — השוואת מחירי ספק</h2>
 
-  <p>מערכת זו משווה בין מחירון הספק השבועי לבין ההוצאות בפועל. ההשוואה מתבצעת לפי <strong>שבוע + מק"ט</strong>.</p>
+  <p>מערכת זו משווה בין מחירון הספק לבין מה ששילמתם בפועל. ההשוואה נעשית לפי <strong>שבוע + מק"ט</strong> (מספר מוצר).</p>
 
-  <!-- Step 1 -->
+  <div class="tip" style="margin-bottom: 14px;">
+    <strong>הכל במסך אחד:</strong> בתפריט יש רק שני דברים — <strong>התחל השוואה</strong> ו<strong>מדריך שימוש</strong>. אין צורך לזכור סדר פעולות מורכב.
+  </div>
+
+  <!-- Main flow -->
   <div class="step">
     <span class="step-num">1</span>
-    <span class="step-title">העלאת מחירון שבועי</span>
+    <span class="step-title">לחצו: התחל השוואה</span>
     <div class="step-body">
-      <p>בכל שבוע הספק שולח קובץ מחירון (Excel).</p>
-      <p>לחצו על <strong>תפריט: 🍎 השוואת מחירים → העלה מחירון שבועי</strong></p>
-      <p>בחלון שנפתח:</p>
-      <ul>
-        <li>הזינו את <strong>מספר השבוע</strong> בפורמט <code>YYYY-WW</code><br>לדוגמה: <code>2026-18</code> = שבוע 18 של 2026</li>
-        <li>בחרו את <strong>קובץ ה-Excel</strong> של המחירון</li>
-        <li>לחצו <strong>העלה</strong></li>
+      <p>נפתח חלון עם <strong>שלושה שלבים פשוטים</strong> באותו מסך:</p>
+      <ul style="margin-right: 18px; margin-top: 8px;">
+        <li><strong>קובץ מחירון</strong> — קובץ Excel שהספק שולח (עמודות: מקט, פריט, מחירון)</li>
+        <li><strong>תאריך</strong> — מתי המחירון הזה רלוונטי? בוחרים תאריך בלוח שנה; המערכת מחשבת את השבוע לבד — <em>אין צורך להקליד מספרי שבוע</em></li>
+        <li><strong>קובץ הוצאות</strong> — דוח הרכישות מהספק (Excel עם תאריכים, מקטים ומחירים)</li>
       </ul>
-      <p>הקובץ צריך להכיל את העמודות:</p>
-      <div class="columns">מקט | פריט | מחירון</div>
-      <p>המחירון נשמר בגיליון <strong>Pricing</strong> ומצטבר — כל השבועות נשמרים יחד.</p>
+      <p style="margin-top: 10px;">בסוף לוחצים על הכפתור הירוק <strong>השווה עכשיו</strong>.</p>
+      <p>התוצאות מופיעות בגיליון <strong>Comparison</strong> (צבעים: ירוק תואם, אדום לא תואם, צהוב חסר במחירון).</p>
     </div>
   </div>
 
-  <!-- Step 2 -->
   <div class="step">
     <span class="step-num">2</span>
-    <span class="step-title">העלאת דוח הוצאות</span>
+    <span class="step-title">מה קורה מאחורי הקלעים?</span>
     <div class="step-body">
-      <p>בסוף החודש הספק שולח דוח הוצאות (Excel).</p>
-      <p>לחצו על <strong>תפריט: 🍎 השוואת מחירים → העלה דוח הוצאות</strong></p>
-      <p>בחלון שנפתח:</p>
-      <ul>
-        <li>בחרו את <strong>קובץ ה-Excel</strong> של ההוצאות</li>
-        <li>לחצו <strong>העלה</strong></li>
-      </ul>
-      <p>העמודות הנדרשות בקובץ:</p>
-      <div class="columns">#, כרטיס, לקוח, תעודה, תאריך, אספקה, מקט, פריט, כמות, מחיר לפני מע"מ, מחיר לאחר מע"מ, הנחה, סכ"ה שורה</div>
-      <div class="tip" style="margin-top: 8px;">
-        <strong>שימו לב:</strong> העלאת קובץ חדש מחליפה את הנתונים הקיימים בגיליון Expenses.
-      </div>
-    </div>
-  </div>
-
-  <!-- Step 3 -->
-  <div class="step">
-    <span class="step-num">3</span>
-    <span class="step-title">הרצת ההשוואה</span>
-    <div class="step-body">
-      <p>לחצו על <strong>תפריט: 🍎 השוואת מחירים → הרץ השוואה</strong></p>
-      <p>המערכת תבצע:</p>
-      <ul>
-        <li>המרת תאריך כל הוצאה למספר שבוע</li>
-        <li>חיפוש מחיר מחירון לפי <strong>שבוע + מק"ט</strong></li>
-        <li>השוואת מחיר בפועל מול מחיר מחירון</li>
-        <li>כתיבת התוצאות בגיליון <strong>Comparison</strong></li>
-      </ul>
+      <p>המחירון נשמר בגיליון <strong>Pricing</strong> ומתווסף לשאר השבועות (לא צריך למחוק ישנים).</p>
+      <p>דוח ההוצאות נשמר בגיליון <strong>Expenses</strong> (העלאה חדשה מחליפה את הקודם — זה רגיל בסוף חודש).</p>
+      <p>כל שורת רכישה משווה לפי <strong>השבוע של התאריך שלה</strong> מול המחיר במחירון לאותו שבוע ואותו מק"ט.</p>
     </div>
   </div>
 
