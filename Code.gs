@@ -1,3 +1,5 @@
+/** @OnlyCurrentDoc */
+
 /**
  * fruitVeggieComparator — Google Apps Script
  *
@@ -16,6 +18,8 @@
  *   otherwise             → ❌ לא תואם  (min diff across price columns)
  *   no pricing entry      → 🟡 חסר במחירון
  */
+
+// OAuth: הגבלה לגיליון הנוכחי בלבד (יחד עם oauthScopes ב-appsscript.json) — פחות אזהרות מגוגל.
 
 // ──────────────────────────────────────────────
 // CONFIGURATION
